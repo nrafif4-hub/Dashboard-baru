@@ -5,18 +5,20 @@ Fungsi-fungsi bantu (helpers) yang dipakai di berbagai halaman.
 import pandas as pd
 import streamlit as st
 
+from utils.config import THRESHOLD_CHURN_PROB
+
 
 # ── HELPERS ───────────────────────────────────────────────────
 def warna_prob(p):
-    return "#e74c3c" if p >= .5 else "#27ae60"
+    return "#e74c3c" if p >= THRESHOLD_CHURN_PROB else "#27ae60"
 
 def label_prob(p):
     """Biner sesuai fokus penelitian: Churn vs Tidak Churn (tanpa tingkat Sangat Tinggi/Sedang/Rendah)."""
-    return "Berpotensi Churn" if p >= .5 else "Tidak Churn"
+    return "Berpotensi Churn" if p >= THRESHOLD_CHURN_PROB else "Tidak Churn"
 
 def get_pic(p):
     """Biner: Tim Retensi untuk berpotensi churn, Manajer Program untuk tidak churn."""
-    if p >= .5:
+    if p >= THRESHOLD_CHURN_PROB:
         return "Tim Retensi", "Tindak lanjut segera (maks. 3 hari kerja)"
     return "Manajer Program", "Monitoring rutin bulanan"
 
@@ -27,14 +29,14 @@ def goto_detail(donor_id):
 
 def get_faktor(row):
     """Alasan ditampilkan disesuaikan dengan status churn/tidak churn donatur ini."""
-    is_churn = (row["churn"] == 1) if "churn" in row and pd.notna(row.get("churn")) else (row["prob_churn"] >= .5)
+    is_churn = (row["churn"] == 1) if "churn" in row and pd.notna(row.get("churn")) else (row["prob_churn"] >= THRESHOLD_CHURN_PROB)
     f = []
     if is_churn:
         if row["recency"] > 365:
             f.append(f"⏱ Sudah {int(row['recency'])} hari tidak berdonasi (lebih dari 1 tahun)")
         elif row["recency"] > 180:
             f.append(f"⏱ Sudah {int(row['recency'])} hari tidak berdonasi (lebih dari 6 bulan)")
-        elif row["recency"] > 90:
+        elif row["recency"] > 60:
             f.append(f"⏱ Sudah {int(row['recency'])} hari tidak berdonasi")
         if row["frequency"] <= 2:
             f.append(f"📉 Frekuensi donasi sangat rendah — hanya {int(row['frequency'])} kali")
@@ -61,7 +63,7 @@ def get_aksi(row):
     jika SHAP tidak tersedia (model/scaler belum di-load atau library shap belum terpasang)."""
     p    = row["prob_churn"]
     prog = row.get("program","-")
-    if p >= .5:
+    if p >= THRESHOLD_CHURN_PROB:
         return [
             (True,  f'Hubungi langsung via WhatsApp — sebut nama & program "{prog}" yang pernah didukung'),
             (True,  'Tanyakan kabar dan kendala — apakah ada hal yang menghambat donasi?'),
@@ -94,7 +96,7 @@ def get_aksi_shap(row, model, scaler, fitur):
     p    = row["prob_churn"]
     prog = row.get("program", "-")
 
-    if p < .5:
+    if p < THRESHOLD_CHURN_PROB:
         return [
             (False, 'Kirim ucapan apresiasi — akui loyalitas dan kontribusi yang sudah diberikan'),
             (False, 'Tawarkan program donasi rutin bulanan (auto-debit) agar lebih mudah'),
@@ -152,6 +154,7 @@ def parse_tgl(t):
 def kpi_card(col, cls, ikon, lbl, val, sub):
     with col:
         st.markdown(f"""<div class="kpi {cls}">
+            <div class="kpi-icon-watermark">{ikon}</div>
             <div class="kpi-lbl">{ikon} {lbl}</div>
             <div class="kpi-val">{val}</div>
             <div class="kpi-sub">{sub}</div>

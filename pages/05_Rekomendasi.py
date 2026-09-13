@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 
-st.markdown("# 💡 Rekomendasi untuk Tim Yayasan")
+st.markdown('<div class="hero-title">💡 Rekomendasi untuk Tim Yayasan</div>', unsafe_allow_html=True)
 st.caption("Panduan praktis menangani donatur berpotensi churn")
 
 st.markdown('<div class="sec">📋 Tabel Prioritas Tindakan per Status Donatur</div>', unsafe_allow_html=True)
@@ -12,30 +12,37 @@ st.dataframe(pd.DataFrame([
 ]), use_container_width=True, hide_index=True)
 
 st.markdown('<div class="sec">🛠️ 6 Tindakan Retensi Donatur</div>', unsafe_allow_html=True)
-r1c1,r1c2,r1c3 = st.columns(3)
-r2c1,r2c2,r2c3 = st.columns(3)
-for col,title,body in [
-    (r1c1,"📱 1. Hubungi Secara Personal",
+reko_items = [
+    ("📱", "1. Hubungi Secara Personal",
      "Sebutkan nama donatur dan program yang pernah didukungnya. "
      "Pesan yang terasa personal jauh lebih efektif daripada pesan siaran (broadcast) massal."),
-    (r1c2,"🏆 2. Sampaikan Apresiasi",
+    ("🏆", "2. Sampaikan Apresiasi",
      "Akui kontribusi donatur secara spesifik — sebutkan berapa orang yang "
      "terbantu dari donasinya. Donatur yang merasa dihargai cenderung tetap loyal."),
-    (r1c3,"🤝 3. Tanyakan Kendala",
+    ("🤝", "3. Tanyakan Kendala",
      "Buka komunikasi dua arah. Tanyakan apakah ada hambatan yang membuat mereka "
      "tidak lagi berdonasi, baik dari sisi teknis, finansial, maupun kepercayaan."),
-    (r2c1,"📊 4. Kirim Laporan Dampak Donasi",
+    ("📊", "4. Kirim Laporan Dampak Donasi",
      "Kirimkan cerita nyata tentang dampak donasi mereka, misalnya foto penerima manfaat, "
      "jumlah yang terbantu, dan kontribusi spesifik donatur tersebut."),
-    (r2c2,"📅 5. Manfaatkan Momen Musiman",
+    ("📅", "5. Manfaatkan Momen Musiman",
      "Gunakan momen Ramadan, Idul Adha, akhir tahun, atau kejadian kemanusiaan "
      "sebagai kesempatan mengajak donatur kembali berdonasi."),
-    (r2c3,"🔄 6. Ganti Kanal Komunikasi",
+    ("🔄", "6. Ganti Kanal Komunikasi",
      "Jika pesan WhatsApp tidak direspons dalam 14 hari, coba hubungi lewat telepon "
      "atau email. Catat kanal mana yang paling efektif untuk tiap donatur."),
-]:
+]
+r1c1,r1c2,r1c3 = st.columns(3)
+r2c1,r2c2,r2c3 = st.columns(3)
+for col, (icon, title, body) in zip([r1c1,r1c2,r1c3,r2c1,r2c2,r2c3], reko_items):
     with col:
-        st.info(f"**{title}**\n\n{body}")
+        st.markdown(f"""
+        <div class="reko-card">
+            <div class="reko-card-icon">{icon}</div>
+            <div class="reko-card-title">{title}</div>
+            <div class="reko-card-body">{body}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown('<div class="sec">💎 Prinsip Dasar Menjaga Loyalitas Donatur</div>', unsafe_allow_html=True)
 t1,t2,t3,t4 = st.tabs(["🤲 Kepercayaan","👥 Relasi","🔍 Transparansi","💎 Loyalitas"])

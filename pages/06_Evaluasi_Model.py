@@ -12,7 +12,7 @@ from utils.model import predict_churn_proba
 model, scaler, meta = load_all()
 rfm_df = load_rfm()
 
-st.markdown("# 🔬 Evaluasi Model")
+st.markdown('<div class="hero-title">🔬 Evaluasi Model</div>', unsafe_allow_html=True)
 st.caption("Hasil pengujian model XGBoost pada data uji yang terpisah dari data latih")
 
 if meta is None:

@@ -2,10 +2,11 @@ import streamlit as st
 
 from utils.data_loader import load_rfm
 from utils.helpers import kpi_card
+from utils.config import THRESHOLD_CHURN_PROB
 
 rfm_df = load_rfm()
 
-st.markdown("# 📋 Daftar & Segmentasi Donatur")
+st.markdown('<div class="hero-title">📋 Daftar & Segmentasi Donatur</div>', unsafe_allow_html=True)
 
 if rfm_df is None:
     st.error("⚠ Jalankan `train_model.py` terlebih dahulu.")
@@ -85,10 +86,25 @@ disp["Terakhir Donasi"]   = disp["recency"].astype(int).astype(str)+" hari lalu"
 disp["Jumlah Donasi"]     = disp["frequency"].astype(int).astype(str)+"x"
 disp["Total Donasi"]      = disp["monetary"].apply(lambda x: f"Rp {x:,.0f}")
 disp["Tanggal Terakhir"]  = disp["last_date"].dt.strftime("%d %b %Y")
-disp["PIC"] = disp["prob_churn"].apply(lambda p: "Tim Retensi" if p>=.5 else "Manajer Program")
+disp["PIC"] = disp["prob_churn"].apply(lambda p: "Tim Retensi" if p>=THRESHOLD_CHURN_PROB else "Manajer Program")
+
+# ── Pagination ───────────────────────────────────────────────
+PAGE_SIZE = 50
+total_pages = max(1, (len(disp) + PAGE_SIZE - 1) // PAGE_SIZE)
+pg_col1, pg_col2, pg_col3 = st.columns([1, 2, 1])
+with pg_col2:
+    page_num = st.number_input(
+        f"Halaman (1–{total_pages})", min_value=1, max_value=total_pages, value=1,
+        label_visibility="collapsed"
+    )
+st.caption(f"Halaman **{page_num}** dari **{total_pages}** ({PAGE_SIZE} donatur per halaman)")
+
+start_idx = (page_num - 1) * PAGE_SIZE
+end_idx = min(start_idx + PAGE_SIZE, len(disp))
+disp_page = disp.iloc[start_idx:end_idx]
 
 st.dataframe(
-    disp[["ID Donatur","Prob. Churn","Status","Terakhir Donasi",
+    disp_page[["ID Donatur","Prob. Churn","Status","Terakhir Donasi",
           "Jumlah Donasi","Total Donasi","program","PIC"]].rename(
               columns={"program":"Program Terakhir"}),
     use_container_width=True, height=500, hide_index=True,

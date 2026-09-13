@@ -139,21 +139,30 @@ cp = rfm.groupby("cluster").agg(
 ).round(2)
 
 # ── [5] LABELING — BINER: Churn vs Tidak Churn ───────────────
+#     Label sekarang berdasarkan THRESHOLD RECENCY, bukan cluster K-Means.
+#     K-Means tetap dipertahankan untuk segmentasi visual (profil cluster),
+#     tapi TIDAK dipakai untuk menentukan label churn.
 print("[5/11] Data labeling (Churn vs Tidak Churn)...")
+
+# Baca threshold dari config (default: 60 hari)
+from utils.config import get_threshold_churn_hari
+THRESHOLD_CHURN_HARI = get_threshold_churn_hari()
+
+rfm["churn"]  = (rfm["recency"] >= THRESHOLD_CHURN_HARI).astype(int)
+rfm["segmen"] = rfm["churn"].map({1: "Berpotensi Churn", 0: "Tidak Churn"})
+
+# Profil cluster tetap dihitung untuk visualisasi di Evaluasi Model
 cp["churn_score"] = (
       cp["recency_mean"].rank(ascending=True)
     - cp["frequency_mean"].rank(ascending=True)
     - cp["monetary_mean"].rank(ascending=True)
 )
 churn_cluster = int(cp["churn_score"].idxmax())
-# Segmen: hanya 2 kategori sesuai fokus penelitian
-rfm["churn"]  = (rfm["cluster"] == churn_cluster).astype(int)
-rfm["segmen"] = rfm["churn"].map({1:"Berpotensi Churn", 0:"Tidak Churn"})
 
 n_churn = rfm["churn"].sum()
-print(f"  Cluster churn : Cluster {churn_cluster}")
-print(f"  Churn (1)     : {n_churn:,} ({n_churn/len(rfm)*100:.1f}%)")
-print(f"  Tidak Churn (0): {len(rfm)-n_churn:,} ({(len(rfm)-n_churn)/len(rfm)*100:.1f}%)")
+print(f"  Threshold churn : Recency >= {THRESHOLD_CHURN_HARI} hari")
+print(f"  Churn (1)       : {n_churn:,} ({n_churn/len(rfm)*100:.1f}%)")
+print(f"  Tidak Churn (0) : {len(rfm)-n_churn:,} ({(len(rfm)-n_churn)/len(rfm)*100:.1f}%)")
 
 # ── [6] SCALING ───────────────────────────────────────────────
 print("[6/11] Min-Max Scaling...")
@@ -234,6 +243,7 @@ joblib.dump({
     "n_total"       : len(rfm),
     "n_churn"       : int(n_churn),
     "n_transaksi"   : len(df),
+    "threshold_churn_hari": THRESHOLD_CHURN_HARI,
     "penurunan"     : "Rp 130.000.000 (Des 2025 – Feb 2026)",
 }, "model_metadata.pkl")
 rfm.to_csv("rfm_hasil.csv", index=False)

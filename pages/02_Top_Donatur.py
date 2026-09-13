@@ -4,11 +4,12 @@ import plotly.graph_objects as go
 
 from utils.data_loader import load_rfm, load_riwayat
 from utils.helpers import kpi_card
+from utils.config import THRESHOLD_CHURN_PROB
 
 rfm_df = load_rfm()
 riwayat_df = load_riwayat()
 
-st.markdown("# 🏆 Top 10 Donatur Terbesar")
+st.markdown('<div class="hero-title">🏆 Top 10 Donatur Terbesar</div>', unsafe_allow_html=True)
 st.caption("Donatur dengan kontribusi nominal tertinggi — dapat difilter per periode waktu")
 
 if rfm_df is None:
@@ -82,18 +83,21 @@ with c1:
 with c2:
     st.markdown('<div class="sec">🏅 Podium 3 Teratas</div>', unsafe_allow_html=True)
     medali = ["🥇","🥈","🥉"]
+    podium_cls = ["podium-1", "podium-2", "podium-3"]
     for i in range(min(3, len(top10_donasi))):
         r = top10_donasi.iloc[i]
         st.markdown(f"""
-        <div class="card" style="margin-bottom:10px;">
+        <div class="{podium_cls[i]}" style="margin-bottom:10px;">
             <div style="font-size:22px;">{medali[i]} <b>{r['ID Donatur']}</b></div>
-            <div style="font-size:20px;font-weight:800;color:#1a1a2e;margin-top:4px;">Rp {r['monetary']:,.0f}</div>
+            <div style="font-size:20px;font-weight:800;margin-top:4px;">
+                Rp {r['monetary']:,.0f}
+            </div>
             <div style="font-size:12.5px;color:#8a93a3;margin-top:4px;">
                 {int(r['frequency'])}× donasi · Program: {r.get('program','-')}
             </div>
             <div style="margin-top:8px;">
-                <span class="{'badge-churn' if r['prob_churn']>=.5 else 'badge-ok'}">
-                    {'⚠ Berpotensi Churn' if r['prob_churn']>=.5 else '✅ Tidak Churn'}
+                <span class="{'badge-churn' if r['prob_churn']>=THRESHOLD_CHURN_PROB else 'badge-ok'}">
+                    {'⚠ Berpotensi Churn' if r['prob_churn']>=THRESHOLD_CHURN_PROB else '✅ Tidak Churn'}
                 </span>
             </div>
         </div>""", unsafe_allow_html=True)
@@ -106,7 +110,7 @@ disp["Peringkat"]     = disp.index
 disp["Total Donasi"]  = disp["monetary"].apply(lambda x: f"Rp {x:,.0f}")
 disp["Frekuensi"]     = disp["frequency"].astype(int).astype(str) + "x"
 disp["Terakhir Donasi"] = disp["recency"].astype(int).astype(str) + " hari lalu"
-disp["Status"] = disp["prob_churn"].apply(lambda p: "⚠ Berpotensi Churn" if p>=.5 else "✅ Tidak Churn")
+disp["Status"] = disp["prob_churn"].apply(lambda p: "⚠ Berpotensi Churn" if p>=THRESHOLD_CHURN_PROB else "✅ Tidak Churn")
 
 st.dataframe(
     disp[["Peringkat","ID Donatur","Total Donasi","Frekuensi","Terakhir Donasi","program","Status"]].rename(

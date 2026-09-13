@@ -4,18 +4,21 @@ import plotly.graph_objects as go
 
 from utils.data_loader import load_all, load_rfm, load_riwayat
 from utils.helpers import kpi_card, goto_detail, format_rupiah_ringkas
+from utils.config import THRESHOLD_CHURN_PROB
 
 model, scaler, meta = load_all()
 rfm_df = load_rfm()
 riwayat_df = load_riwayat()
 
-st.markdown("# 🏠 Beranda")
-st.markdown(
-    "Selamat datang di **Sistem Pendukung Keputusan Prediksi Churn Donatur** "
-    "One Ummah Foundation.\n\n"
-    "Sistem ini membantu tim yayasan mengetahui **donatur mana yang berpotensi "
-    "berhenti berdonasi**, sehingga bisa segera ditindak lanjuti sebelum terlambat."
-)
+st.markdown("""
+<div class="hero-title">🏠 Beranda</div>
+<div class="hero-sub">
+    Selamat datang di <b>Sistem Pendukung Keputusan Prediksi Churn Donatur</b>
+    One Ummah Foundation. Sistem ini membantu tim yayasan mengetahui
+    <b>donatur mana yang berpotensi berhenti berdonasi</b>, sehingga bisa
+    segera ditindak lanjuti sebelum terlambat.
+</div>
+""", unsafe_allow_html=True)
 
 if rfm_df is None or meta is None:
     st.error("⚠ Jalankan `train_model.py` terlebih dahulu.")
@@ -30,6 +33,16 @@ k1,k2,k3 = st.columns(3)
 kpi_card(k1,"merah","⚠️","Berpotensi Churn", f"{ch_n/total:.1%}", f"{ch_n:,} donatur perlu perhatian")
 kpi_card(k2,"hijau","✅","Tidak Churn / Aktif", f"{ok_n/total:.1%}", f"{ok_n:,} donatur masih aktif")
 kpi_card(k3,"biru","👥","Total Donatur Dianalisis", f"{total:,}", f"dari {meta['n_transaksi']:,} transaksi")
+
+# ── Tooltip inline ────────────────────────────────────────
+with st.popover("ℹ️ Apa arti angka-angka ini?"):
+    st.markdown(f"""
+**Berpotensi Churn ({ch_n/total:.0%})** — Donatur yang diprediksi akan berhenti berdonasi berdasarkan pola historis mereka.
+
+**Tidak Churn ({ok_n/total:.0%})** — Donatur yang masih aktif dan kemungkinan kecil akan berhenti.
+
+**Threshold saat ini:** Probabilitas ≥ {THRESHOLD_CHURN_PROB:.0%} → Berpotensi Churn
+    """)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -117,16 +130,19 @@ top10 = rfm_df.nlargest(10, "prob_churn")[[
 top10["Prob. Churn"]  = (top10["prob_churn"]*100).round(1).astype(str) + "%"
 top10["Sejak Donasi"] = top10["recency"].astype(int).astype(str) + " hari lalu"
 top10["Total Donasi"] = top10["monetary"].apply(lambda x: f"Rp {x:,.0f}")
-top10["PIC"] = top10["prob_churn"].apply(lambda p: "Tim Retensi" if p>=.5 else "Manajer Program")
+top10["PIC"] = top10["prob_churn"].apply(lambda p: "Tim Retensi" if p>=THRESHOLD_CHURN_PROB else "Manajer Program")
 
+st.markdown('<div class="tbl-header">', unsafe_allow_html=True)
 hdr = st.columns([1.3, 1, 1.1, 1.2, 1.3, 1.1, 1])
 for c, t in zip(hdr, ["ID Donatur","Prob. Churn","Sejak Donasi","Total Donasi","Program","PIC",""]):
     c.markdown(f"**{t}**")
+st.markdown('</div>', unsafe_allow_html=True)
 
 for _, r in top10.iterrows():
+    st.markdown('<div class="tbl-row">', unsafe_allow_html=True)
     row_cols = st.columns([1.3, 1, 1.1, 1.2, 1.3, 1.1, 1])
     row_cols[0].markdown(r["ID Donatur"])
-    row_cols[1].markdown(r["Prob. Churn"])
+    row_cols[1].markdown(f'<span class="badge-churn">{r["Prob. Churn"]}</span>' if float(r["Prob. Churn"].replace("%","")) >= 50 else r["Prob. Churn"], unsafe_allow_html=True)
     row_cols[2].markdown(r["Sejak Donasi"])
     row_cols[3].markdown(r["Total Donasi"])
     row_cols[4].markdown(r["program"])
@@ -134,6 +150,7 @@ for _, r in top10.iterrows():
     with row_cols[6]:
         if st.button("Lihat Detail →", key=f"btn_beranda_{r['ID Donatur']}"):
             goto_detail(r["ID Donatur"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 with st.expander("ℹ️ Cara membaca dashboard ini"):

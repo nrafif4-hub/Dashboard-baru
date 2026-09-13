@@ -5,12 +5,13 @@ import plotly.graph_objects as go
 
 from utils.data_loader import load_all, load_rfm, load_riwayat
 from utils.helpers import warna_prob, label_prob, get_pic, get_faktor, get_aksi_shap
+from utils.config import THRESHOLD_CHURN_PROB
 
 model, scaler, meta = load_all()
 rfm_df = load_rfm()
 riwayat_df = load_riwayat()
 
-st.markdown("# 🔍 Detail Donatur")
+st.markdown('<div class="hero-title">🔍 Detail Donatur</div>', unsafe_allow_html=True)
 st.caption("Lihat informasi lengkap, faktor risiko, riwayat donasi, dan rekomendasi tindakan untuk setiap donatur")
 
 if rfm_df is None:
@@ -56,7 +57,7 @@ h1,h2,h3,h4 = st.columns([2.5,1.5,1,1])
 with h1:
     st.markdown(f"### {did}")
     st.markdown(f"Program: **{row.get('program','-')}** · Cara Bayar: **{row.get('cara_bayar','-')}**")
-    badge_cls = "badge-churn" if prob>=.5 else "badge-ok"
+    badge_cls = "badge-churn" if prob>=THRESHOLD_CHURN_PROB else "badge-ok"
     st.markdown(f'<span class="{badge_cls}">{lbl}</span>', unsafe_allow_html=True)
     st.caption(f"Terakhir donasi: {pd.to_datetime(row['last_date']).strftime('%d %b %Y')}")
 with h2:
@@ -98,7 +99,7 @@ t1,t2,t3,t4,t5 = st.tabs([
 with t1:
     judul_alasan = (
         "Alasan donatur ini diprediksi **berpotensi churn**:"
-        if prob >= .5 else
+        if prob >= THRESHOLD_CHURN_PROB else
         "Alasan donatur ini diprediksi **tidak churn** (masih aktif):"
     )
     st.markdown(f"**{judul_alasan}**")
@@ -176,7 +177,7 @@ with t2:
         ikon = "🔴" if pr else "⚪"
         st.markdown(f'<div class="{cls}">{ikon} <b>{i}.</b> {txt}</div>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
-    if prob >= .5:
+    if prob >= THRESHOLD_CHURN_PROB:
         st.warning("⚠ **SEGERA** — Hubungi donatur ini, jadwalkan pendekatan sebelum terlambat")
     else:
         st.success("✓ **PANTAU RUTIN** — Donatur masih aktif, pertahankan relasi")
@@ -258,7 +259,7 @@ with t5:
 | **Aksi Pertama (berbasis SHAP)** | {aksi[0][1] if aksi else '-'} |
     """)
     st.markdown("---")
-    if prob >= .5:
+    if prob >= THRESHOLD_CHURN_PROB:
         st.warning(
             f"**KEPUTUSAN SISTEM:** Donatur **{did}** berpotensi berhenti berdonasi "
             f"(probabilitas {pct:.0f}%). Lakukan pendekatan oleh **{pic}** — {pic_urg.lower()}."

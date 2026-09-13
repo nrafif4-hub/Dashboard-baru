@@ -23,7 +23,7 @@ def load_all():
     except FileNotFoundError:
         return None, None, None
 
-@st.cache_data
+@st.cache_data(ttl=300)  # 5 menit TTL
 def load_rfm():
     try:
         df = pd.read_csv(RFM_FILE)
@@ -48,7 +48,7 @@ def _parse_tgl_riwayat(t):
         try: return pd.to_datetime("1 "+t, dayfirst=True)
         except Exception: return pd.NaT
 
-@st.cache_data
+@st.cache_data(ttl=300)  # 5 menit TTL
 def load_riwayat():
     """Riwayat transaksi mentah per donatur (program & tanggal donasi).
     Dibaca langsung dari database transaksi asli (file CSV yang sama

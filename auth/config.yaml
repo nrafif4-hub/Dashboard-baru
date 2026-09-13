@@ -1,0 +1,46 @@
+credentials:
+  usernames:
+    admin:
+      name: "Administrator"
+      password: "$2b$12$widqYhifI6R9STziMH9Ws.vMF9EWwx520ZgiwmV9VWGBpKK2k64JC"
+      role: "admin"
+    retensi:
+      name: "Staf Retensi"
+      password: "$2b$12$gkTKRCGxvncetQWQyE87Fu/KdVCyc4IjQZLP4xyY.fT1SYNzaQ8J2"
+      role: "staf_retensi"
+    viewer:
+      name: "Viewer"
+      password: "$2b$12$m0UOW7BNNrydr1tlB..x4uj2m93N7zv9bd8iBby0uv/X2Li2iKzzS"
+      role: "viewer"
+
+cookie:
+  expiry_days: 7
+  key: "ouf_churn_dashboard_secret_key_2026"
+  name: "ouf_churn_auth"
+
+roles:
+  admin:
+    label: "Admin"
+    description: "Retrain model, ubah config, kelola user, semua akses"
+    pages:
+      - "all"
+  staf_retensi:
+    label: "Staf Retensi"
+    description: "Lihat dashboard, detail donatur, rekomendasi, prediksi baru"
+    pages:
+      - "Beranda"
+      - "Top Donatur"
+      - "Daftar Donatur"
+      - "Detail Donatur"
+      - "Rekomendasi"
+      - "Prediksi Baru"
+  viewer:
+    label: "Viewer"
+    description: "Read-only, tidak bisa upload/retrain/ubah config"
+    pages:
+      - "Beranda"
+      - "Top Donatur"
+      - "Daftar Donatur"
+      - "Detail Donatur"
+      - "Rekomendasi"
+      - "Evaluasi Model"

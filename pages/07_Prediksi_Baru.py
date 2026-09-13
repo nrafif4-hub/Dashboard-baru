@@ -7,12 +7,15 @@ import plotly.graph_objects as go
 from utils.data_loader import load_all, load_rfm, load_riwayat
 from utils.helpers import warna_prob, label_prob, get_pic, get_faktor, get_aksi, parse_tgl, kpi_card
 from utils.model import predict_churn_proba, predict_manual_churn
+from utils.config import THRESHOLD_CHURN_PROB, BACKUP_DIR
+from utils.audit import log_action
+from auth.authenticator import get_username, is_viewer
 
 model, scaler, meta = load_all()
 rfm_df = load_rfm()
 riwayat_df = load_riwayat()
 
-st.markdown("# 🔮 Prediksi Data Baru")
+st.markdown('<div class="hero-title">🔮 Prediksi Data Baru</div>', unsafe_allow_html=True)
 st.caption("Upload data transaksi donatur terbaru untuk mendapatkan prediksi churn secara otomatis")
 
 if model is None or scaler is None or meta is None:
@@ -58,6 +61,15 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
                 df_new = pd.read_csv(uploaded, skiprows=1)
                 df_new.drop(columns=["Unnamed: 0","No"], errors="ignore", inplace=True)
                 df_new.columns = df_new.columns.str.strip()
+
+                # ── Validasi skema kolom wajib ──────────────────
+                REQUIRED_COLS = {"ID Donatur", "Donasi Tanggal", "Nominal", "Program", "Cara Bayar"}
+                missing_cols = REQUIRED_COLS - set(df_new.columns)
+                if missing_cols:
+                    st.error(f"❌ Kolom wajib tidak ditemukan: **{', '.join(sorted(missing_cols))}**")
+                    st.info("Pastikan nama kolom persis sama (huruf besar/kecil sesuai template).")
+                    st.stop()
+
                 df_new["Nominal"] = (
                     df_new["Nominal"].astype(str)
                     .str.replace("Rp","",regex=False)
@@ -66,6 +78,26 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
                 )
                 df_new["Nominal"] = pd.to_numeric(df_new["Nominal"], errors="coerce")
                 df_new["Tanggal"] = df_new["Donasi Tanggal"].apply(parse_tgl)
+
+                # ── Validasi per baris ──────────────────────────
+                row_errors = []
+                for i, r in df_new.iterrows():
+                    baris = i + 3  # +1 index, +1 header, +1 skiprows
+                    if pd.isna(r.get("ID Donatur")) or str(r.get("ID Donatur", "")).strip() == "":
+                        row_errors.append(f"Baris {baris}: ID Donatur kosong")
+                    if pd.isna(r.get("Nominal")) or (not pd.isna(r.get("Nominal")) and r["Nominal"] <= 0):
+                        row_errors.append(f"Baris {baris}: Nominal tidak valid")
+                    if pd.isna(r.get("Tanggal")):
+                        row_errors.append(f"Baris {baris}: Tanggal tidak dapat diparsing ('{r.get('Donasi Tanggal', '')}')")
+
+                if row_errors:
+                    st.error(f"❌ Ditemukan **{len(row_errors)} kesalahan** pada data:")
+                    for err in row_errors[:20]:
+                        st.caption(f"  • {err}")
+                    if len(row_errors) > 20:
+                        st.caption(f"  ... dan {len(row_errors) - 20} kesalahan lainnya")
+                    st.stop()
+
                 df_new.dropna(subset=["ID Donatur","Nominal","Tanggal"], inplace=True)
                 df_new = df_new[df_new["Nominal"] > 0]
 
@@ -83,15 +115,16 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
 
                 FITUR = meta["fitur"]
                 rfm_n["prob_churn"] = predict_churn_proba(model, scaler, FITUR, rfm_n)
-                rfm_n["churn"]      = (rfm_n["prob_churn"] >= .5).astype(int)
+                rfm_n["churn"]      = (rfm_n["prob_churn"] >= THRESHOLD_CHURN_PROB).astype(int)
                 rfm_n["segmen"]     = rfm_n["churn"].map({1:"Berpotensi Churn", 0:"Tidak Churn"})
                 rfm_n["prediksi"]   = rfm_n["churn"]
                 rfm_n["cluster"]    = -1   # tidak dicluster ulang
                 rfm_n["PIC"]        = rfm_n["prob_churn"].apply(
-                    lambda p: "Tim Retensi" if p>=.5 else "Manajer Program"
+                    lambda p: "Tim Retensi" if p>=THRESHOLD_CHURN_PROB else "Manajer Program"
                 )
                 rfm_n["last_date"]  = pd.to_datetime(rfm_n["last_date"])
                 st.session_state["rfm_baru"] = rfm_n
+                log_action(get_username(), "UPLOAD_CSV", f"{total_n} donatur dari file upload")
 
             except Exception as e:
                 st.error(f"❌ Gagal memproses: {e}")
@@ -101,7 +134,7 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
     if "rfm_baru" in st.session_state:
         rfm_n   = st.session_state["rfm_baru"]
         total_n = len(rfm_n)
-        ch_n    = (rfm_n["prob_churn"] >= .5).sum()
+        ch_n    = (rfm_n["prob_churn"] >= THRESHOLD_CHURN_PROB).sum()
 
         st.success(f"✅ **{total_n:,} donatur** berhasil dianalisis")
         st.markdown("<br>", unsafe_allow_html=True)
@@ -148,23 +181,38 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
             gabung = st.button("🔗 Gabungkan Sekarang", type="primary", use_container_width=True)
 
         if gabung:
-            try:
-                if rfm_df is not None:
-                    # Gabungkan: donatur yang sudah ada akan digantikan versi baru
-                    rfm_gabung = pd.concat([rfm_df, rfm_n], ignore_index=True)
-                    rfm_gabung = rfm_gabung.drop_duplicates(subset=["ID Donatur"], keep="last")
-                else:
-                    rfm_gabung = rfm_n.copy()
+            if is_viewer():
+                st.error("🚫 Anda tidak memiliki akses untuk menggabungkan data (role: Viewer).")
+            else:
+                try:
+                    import shutil, os
+                    from datetime import datetime as _dt
 
-                rfm_gabung.to_csv("rfm_hasil.csv", index=False)
-                st.success(
-                    f"✅ Berhasil! Database sekarang berisi **{len(rfm_gabung):,} donatur**. "
-                    "Silakan pindah ke menu lain untuk melihat semua donatur."
-                )
-                st.cache_data.clear()   # paksa reload rfm_hasil.csv
-                st.info("💡 Klik menu lain di sidebar untuk melihat data yang sudah diperbarui.")
-            except Exception as e:
-                st.error(f"❌ Gagal menggabungkan: {e}")
+                    # Backup otomatis sebelum overwrite
+                    if os.path.exists("rfm_hasil.csv"):
+                        os.makedirs(BACKUP_DIR, exist_ok=True)
+                        backup_name = f"rfm_hasil_backup_{_dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                        shutil.copy("rfm_hasil.csv", os.path.join(BACKUP_DIR, backup_name))
+                        st.caption(f"💾 Backup disimpan: `{BACKUP_DIR}/{backup_name}`")
+
+                    if rfm_df is not None:
+                        # Gabungkan: donatur yang sudah ada akan digantikan versi baru
+                        rfm_gabung = pd.concat([rfm_df, rfm_n], ignore_index=True)
+                        rfm_gabung = rfm_gabung.drop_duplicates(subset=["ID Donatur"], keep="last")
+                    else:
+                        rfm_gabung = rfm_n.copy()
+
+                    rfm_gabung.to_csv("rfm_hasil.csv", index=False)
+                    log_action(get_username(), "GABUNG_DATABASE",
+                               f"{len(rfm_gabung)} donatur total setelah penggabungan")
+                    st.success(
+                        f"✅ Berhasil! Database sekarang berisi **{len(rfm_gabung):,} donatur**. "
+                        "Silakan pindah ke menu lain untuk melihat semua donatur."
+                    )
+                    st.cache_data.clear()   # paksa reload rfm_hasil.csv
+                    st.info("💡 Klik menu lain di sidebar untuk melihat data yang sudah diperbarui.")
+                except Exception as e:
+                    st.error(f"❌ Gagal menggabungkan: {e}")
 
         st.markdown("---")
 
@@ -210,7 +258,7 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
 
         hb1, hb2, hb3, hb4 = st.columns([2.5, 1.5, 1, 1])
         with hb1:
-            badge_cls = "badge-churn" if prob_b >= .5 else "badge-ok"
+            badge_cls = "badge-churn" if prob_b >= THRESHOLD_CHURN_PROB else "badge-ok"
             st.markdown(f"**Program:** {row_b.get('program','-')} · **Cara Bayar:** {row_b.get('cara_bayar','-')}")
             st.markdown(f'<span class="{badge_cls}">{lbl_b}</span>', unsafe_allow_html=True)
             st.caption(f"Terakhir donasi: {pd.to_datetime(row_b['last_date']).strftime('%d %b %Y')}")
@@ -245,7 +293,7 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
         with tb1:
             judul_alasan_b = (
                 "Alasan donatur ini diprediksi **berpotensi churn**:"
-                if prob_b >= .5 else
+                if prob_b >= THRESHOLD_CHURN_PROB else
                 "Alasan donatur ini diprediksi **tidak churn** (masih aktif):"
             )
             st.markdown(f"**{judul_alasan_b}**")
@@ -274,7 +322,7 @@ Upload file **CSV** dengan kolom-kolom berikut (nama kolom harus persis sama, hu
                 ikon = "🔴" if pr else "⚪"
                 st.markdown(f'<div class="{cls}">{ikon} <b>{i}.</b> {txt}</div>', unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
-            if prob_b >= .5:
+            if prob_b >= THRESHOLD_CHURN_PROB:
                 st.warning("⚠ **SEGERA** — Hubungi donatur ini, jadwalkan pendekatan sebelum terlambat")
             else:
                 st.success("✓ **PANTAU RUTIN** — Donatur masih aktif, pertahankan relasi")
@@ -348,14 +396,14 @@ with tab_manual:
             st.metric("Nilai donasi",        f"Rp {inp_mon:,.0f}")
 
         st.markdown("**Tindakan yang disarankan:**")
-        dummy = {"prob_churn":inp_prob, "churn": int(inp_prob>=.5),
+        dummy = {"prob_churn":inp_prob, "churn": int(inp_prob>=THRESHOLD_CHURN_PROB),
                  "recency":inp_rec, "frequency":inp_frq, "monetary":inp_mon, "program":"-"}
         for pr,txt in get_aksi(dummy):
             cls  = "aksi-p" if pr else "aksi-n"
             ikon = "🔴" if pr else "⚪"
             st.markdown(f'<div class="{cls}">{ikon} {txt}</div>', unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        if inp_prob >= .5:
+        if inp_prob >= THRESHOLD_CHURN_PROB:
             st.warning(f"⚠ Berpotensi churn — segera tindak lanjut ({inp_pic})")
         else:
             st.success(f"✓ Tidak churn — pantau rutin ({inp_pic})")
