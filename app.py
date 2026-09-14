@@ -14,7 +14,7 @@ import streamlit as st
 warnings.filterwarnings("ignore")
 
 from utils.config import APP_VERSION_CAPTION
-from auth.authenticator import check_login, get_user_role, get_user_name, show_logout_button, can_access_page
+#from auth.authenticator import check_login, get_user_role, get_user_name, show_logout_button, can_access_page
 
 # ── KONFIGURASI ───────────────────────────────────────────────
 st.set_page_config(
@@ -24,8 +24,8 @@ st.set_page_config(
 )
 
 # ── AUTENTIKASI ───────────────────────────────────────────────
-if not check_login():
-    st.stop()
+#if not check_login():
+ #   st.stop()
 
 st.markdown("""
 <style>
@@ -380,7 +380,7 @@ with st.sidebar:
     st.caption("Dakwah · Ekonomi · Sosial · Pendidikan · Kemanusiaan")
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    show_logout_button()
+    #show_logout_button()
 
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
