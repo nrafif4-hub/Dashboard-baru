@@ -363,7 +363,7 @@ all_pages = [
 
 pages = []
 for title, path, icon, is_default in all_pages:
-    if can_access_page(title):
+  #  if can_access_page(title):
         try:
             pages.append(st.Page(path, title=title, icon=icon, default=is_default))
         except Exception:
