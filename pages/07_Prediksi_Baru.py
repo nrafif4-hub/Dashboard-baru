@@ -9,7 +9,7 @@ from utils.helpers import warna_prob, label_prob, get_pic, get_faktor, get_aksi,
 from utils.model import predict_churn_proba, predict_manual_churn
 from utils.config import THRESHOLD_CHURN_PROB, BACKUP_DIR
 from utils.audit import log_action
-from auth.authenticator import get_username, is_viewer
+#from auth.authenticator import get_username, is_viewer
 
 model, scaler, meta = load_all()
 rfm_df = load_rfm()
